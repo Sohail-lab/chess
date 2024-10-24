@@ -1,0 +1,16 @@
+platform :ios, '10.0'
+
+# Use frameworks
+use_frameworks!
+
+# Define the target for your app
+target 'Runner' do
+  # Use this method provided by Flutter
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+# Define the target for your tests
+target 'RunnerTests' do
+  inherit! :search_paths
+  # Pods for testing
+end
