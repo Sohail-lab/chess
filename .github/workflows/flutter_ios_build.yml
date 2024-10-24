@@ -1,0 +1,43 @@
+name: Build iOS
+
+on:
+  push:
+    branches:
+      - main  # Change to your target branch
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'  # or a specific version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods
+          cd ios
+          pod install
+
+      - name: Build iOS
+        run: flutter build ios --release
+
+      - name: Archive iOS App
+        run: |
+          mkdir -p output
+          cp -R build/ios/iphoneos/Runner.app output/
+          
+      - name: Upload iOS App
+        uses: actions/upload-artifact@v2
+        with:
+          name: ios-app
+          path: output/
