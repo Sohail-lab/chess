@@ -1,8 +1,8 @@
-import 'dart:math';
-import 'package:chess/components/deadPiece.dart';
 import 'package:chess/components/piece.dart';
 import 'package:chess/components/square.dart';
 import 'package:flutter/material.dart';
+import 'package:timer_count_down/timer_count_down.dart';
+import 'package:timer_count_down/timer_controller.dart';
 
 class GameBoard extends StatefulWidget {
   const GameBoard({super.key});
@@ -13,6 +13,13 @@ class GameBoard extends StatefulWidget {
 
 class _GameBoardState extends State<GameBoard> {
   late List<List<ChessPiece?>> board;
+
+  final CountdownController _countdownControllerW =
+      CountdownController(autoStart: false);
+  final CountdownController _countdownControllerB =
+      CountdownController(autoStart: false);
+  bool whiteTimeOut = false;
+  bool blackTimeOut = false;
 
   ChessPiece? selectedPiece;
   int selectedRow = -1;
@@ -25,10 +32,9 @@ class _GameBoardState extends State<GameBoard> {
 
   bool isWhiteTurn = true;
 
-  List<int> whiteKingPosition = [0,3];
-  List<int> blackKingPosition = [7,3];
+  List<int> whiteKingPosition = [0, 3];
+  List<int> blackKingPosition = [7, 3];
   bool checkStatus = false;
-
 
   @override
   void initState() {
@@ -43,6 +49,9 @@ class _GameBoardState extends State<GameBoard> {
   void _initializeBoard() {
     List<List<ChessPiece?>> newBoard =
         List.generate(8, (index) => List.generate(8, (index) => null));
+
+    _countdownControllerW.start();
+    _countdownControllerB.start();
 
     // pawns
     for (int i = 0; i < 8; i++) {
@@ -137,8 +146,11 @@ class _GameBoardState extends State<GameBoard> {
 
   void pieceSelected(int row, int col) {
     setState(() {
+      if (isWhiteTurn) {
+        _countdownControllerW.resume();
+      }
       if (selectedPiece == null && board[row][col] != null) {
-        if(board[row][col]!.isWhite == isWhiteTurn) {
+        if (board[row][col]!.isWhite == isWhiteTurn) {
           selectedPiece = board[row][col];
           selectedRow = row;
           selectedCol = col;
@@ -153,8 +165,8 @@ class _GameBoardState extends State<GameBoard> {
         movePiece(row, col);
       }
 
-      validMoves =
-          calculateRealValidMoves(selectedRow, selectedCol, selectedPiece, true);
+      validMoves = calculateRealValidMoves(
+          selectedRow, selectedCol, selectedPiece, true);
     });
   }
 
@@ -342,21 +354,21 @@ class _GameBoardState extends State<GameBoard> {
     return candidateMoves;
   }
 
-  List<List<int>> calculateRealValidMoves(int row, int col, ChessPiece? piece, bool checkSimulation){
+  List<List<int>> calculateRealValidMoves(
+      int row, int col, ChessPiece? piece, bool checkSimulation) {
     List<List<int>> realValidMoves = [];
     List<List<int>> candidateMoves = calculateRawValidMoves(row, col, piece);
 
-    if(checkSimulation) {
-      for(var move in candidateMoves) {
+    if (checkSimulation) {
+      for (var move in candidateMoves) {
         int endRow = move[0];
         int endCol = move[1];
 
-        if(simulatedMoveIsSafe(piece!, row, col, endRow, endCol)) {
+        if (simulatedMoveIsSafe(piece!, row, col, endRow, endCol)) {
           realValidMoves.add(move);
         }
       }
-    }
-    else {
+    } else {
       realValidMoves = candidateMoves;
     }
 
@@ -364,6 +376,13 @@ class _GameBoardState extends State<GameBoard> {
   }
 
   void movePiece(int newRow, int newCol) {
+    if (isWhiteTurn) {
+      _countdownControllerW.pause();
+      _countdownControllerB.resume();
+    } else {
+      _countdownControllerB.pause();
+      _countdownControllerW.resume();
+    }
     if (board[newRow][newCol] != null) {
       var capturedPiece = board[newRow][newCol];
       if (capturedPiece!.isWhite) {
@@ -373,11 +392,10 @@ class _GameBoardState extends State<GameBoard> {
       }
     }
 
-    if(selectedPiece!.type == PieceType.king) {
-      if(selectedPiece!.isWhite) {
+    if (selectedPiece!.type == PieceType.king) {
+      if (selectedPiece!.isWhite) {
         whiteKingPosition = [newRow, newCol];
-      }
-      else {
+      } else {
         blackKingPosition = [newRow, newCol];
       }
     }
@@ -385,10 +403,9 @@ class _GameBoardState extends State<GameBoard> {
     board[newRow][newCol] = selectedPiece;
     board[selectedRow][selectedCol] = null;
 
-    if(isKingInCheck(!isWhiteTurn)) {
+    if (isKingInCheck(!isWhiteTurn)) {
       checkStatus = true;
-    }
-    else {
+    } else {
       checkStatus = false;
     }
 
@@ -399,30 +416,36 @@ class _GameBoardState extends State<GameBoard> {
       validMoves = [];
     });
 
-    if(isCheckMate(!isWhiteTurn)) {
-      showDialog(context: context, builder: (context) => AlertDialog(
-        title: Text("CHECK MATE!"),
-        actions: [
-          TextButton(onPressed: resetGame, child: Text("Play Again")),
-        ],
-      ));
+    if (isCheckMate(!isWhiteTurn)) {
+      showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+                title: const Text("CHECK MATE!"),
+                actions: [
+                  TextButton(
+                      onPressed: resetGame, child: const Text("Play Again")),
+                ],
+              ));
     }
 
     isWhiteTurn = !isWhiteTurn;
   }
 
   bool isKingInCheck(bool isWhiteKing) {
-    List<int> kingPosition = isWhiteKing ? whiteKingPosition : blackKingPosition;
+    List<int> kingPosition =
+        isWhiteKing ? whiteKingPosition : blackKingPosition;
 
-    for(int i = 0; i < 8; i++) {
-      for(int j = 0; j < 8; j++) {
-        if(board[i][j] == null || board[i][j]!.isWhite == isWhiteKing) {
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        if (board[i][j] == null || board[i][j]!.isWhite == isWhiteKing) {
           continue;
         }
 
-        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, board[i][j], false);
+        List<List<int>> pieceValidMoves =
+            calculateRealValidMoves(i, j, board[i][j], false);
 
-        if(pieceValidMoves.any((move) => move[0] == kingPosition[0] && move[1] == kingPosition[1])) {
+        if (pieceValidMoves.any((move) =>
+            move[0] == kingPosition[0] && move[1] == kingPosition[1])) {
           return true;
         }
       }
@@ -430,17 +453,18 @@ class _GameBoardState extends State<GameBoard> {
     return false;
   }
 
-  bool simulatedMoveIsSafe(ChessPiece piece, int startRow, int startCol, int endRow, int endCol) {
+  bool simulatedMoveIsSafe(
+      ChessPiece piece, int startRow, int startCol, int endRow, int endCol) {
     ChessPiece? originalDestinationPiece = board[endRow][endCol];
 
     List<int>? originalKingPosition;
-    if(piece.type == PieceType.king) {
-      originalKingPosition = piece.isWhite ? whiteKingPosition : blackKingPosition;
+    if (piece.type == PieceType.king) {
+      originalKingPosition =
+          piece.isWhite ? whiteKingPosition : blackKingPosition;
 
-      if(piece.isWhite) {
+      if (piece.isWhite) {
         whiteKingPosition = [endRow, endCol];
-      }
-      else {
+      } else {
         blackKingPosition = [endRow, endCol];
       }
     }
@@ -453,11 +477,10 @@ class _GameBoardState extends State<GameBoard> {
     board[startRow][startCol] = piece;
     board[endRow][endCol] = originalDestinationPiece;
 
-    if(piece.type == PieceType.king) {
-      if(piece.isWhite) {
+    if (piece.type == PieceType.king) {
+      if (piece.isWhite) {
         whiteKingPosition = originalKingPosition!;
-      }
-      else {
+      } else {
         blackKingPosition = originalKingPosition!;
       }
     }
@@ -466,19 +489,20 @@ class _GameBoardState extends State<GameBoard> {
   }
 
   bool isCheckMate(bool isWhiteKing) {
-    if(!isKingInCheck(isWhiteKing)) {
+    if (!isKingInCheck(isWhiteKing)) {
       return false;
     }
 
-    for(int i = 0; i < 8; i++) {
-      for(int j = 0; j < 8; j++) {
-        if(board[i][j] == null || board[i][j]!.isWhite != isWhiteKing) {
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        if (board[i][j] == null || board[i][j]!.isWhite != isWhiteKing) {
           continue;
         }
 
-        List<List<int>> pieceValidMoves = calculateRealValidMoves(i, j, board[i][j], true);
+        List<List<int>> pieceValidMoves =
+            calculateRealValidMoves(i, j, board[i][j], true);
 
-        if(pieceValidMoves.isNotEmpty) {
+        if (pieceValidMoves.isNotEmpty) {
           return false;
         }
       }
@@ -488,79 +512,198 @@ class _GameBoardState extends State<GameBoard> {
   }
 
   void resetGame() {
-    Navigator.pop(context);
+    // Navigator.pop(context);
     _initializeBoard();
     checkStatus = false;
     whitePiecesDead.clear();
     blackPiecesDead.clear();
-    whiteKingPosition = [0,3];
-    blackKingPosition = [7,3];
+    whiteKingPosition = [0, 3];
+    blackKingPosition = [7, 3];
     isWhiteTurn = true;
+    _countdownControllerW.restart();
+    _countdownControllerB.restart();
+    _countdownControllerW.pause();
+    _countdownControllerB.pause();
     setState(() {});
+  }
+
+  Color getTimeOutColorW() {
+    if (whiteTimeOut) {
+      return Colors.redAccent;
+    }
+    return Colors.brown[300]!;
+  }
+
+  Color getTimeOutColorB() {
+    if (blackTimeOut) {
+      return Colors.redAccent;
+    }
+    return Colors.brown[300]!;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          Expanded(
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: whitePiecesDead.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 8),
-                  itemBuilder: (context, index) => DeadPiece(
-                    imagePath: whitePiecesDead[index].imagePath,
-                    isWhite: true,
-                  ))),
-
-          Text(checkStatus ? "CHECK!" : ""),
-
-          Expanded(
-            flex: 3,
-            child: GridView.builder(
-                itemCount: 8 * 8,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                ),
-                itemBuilder: (context, index) {
-                  int row = index ~/ 8;
-                  int col = index % 8;
-
-                  bool isWhite = (row + col) % 2 == 0;
-
-                  bool isSelected = selectedRow == row && selectedCol == col;
-
-                  bool isValidMove = false;
-                  for (var position in validMoves) {
-                    if (position[0] == row && position[1] == col) {
-                      isValidMove = true;
-                    }
-                  }
-
-                  return Square(
-                    isWhite: isWhite,
-                    piece: board[row][col],
-                    isSelected: isSelected,
-                    isValidMove: isValidMove,
-                    onTap: () => pieceSelected(row, col),
-                  );
-                }),
-          ),
-          Expanded(
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                  itemCount: blackPiecesDead.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 8),
-                  itemBuilder: (context, index) => DeadPiece(
-                    imagePath: blackPiecesDead[index].imagePath,
-                    isWhite: false,
-                  ))),
-        ],
+      appBar: AppBar(
+        shadowColor: Colors.transparent,
+        backgroundColor: Colors.transparent,
       ),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            Colors.white,
+            // Colors.brown[300]!,
+            // Colors.brown[300]!,
+            getTimeOutColorW(),
+            getTimeOutColorB(),
+            Colors.white
+          ], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(
+              height: 60,
+            ),
+            Row(
+              children: [
+                const Card(
+                  color: Colors.black26,
+                  shape: StadiumBorder(side: BorderSide(width: 3)),
+                  child: Text(
+                    " Player 1 ",
+                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Padding(padding: EdgeInsets.only(left: 135)),
+                Card(
+                  elevation: 0.0,
+                  color: Colors.black54,
+                  shape: const StadiumBorder(side: BorderSide()),
+                  child: Countdown(
+                    controller: _countdownControllerW,
+                    seconds: 600,
+                    build: (_, double time) => time.toInt() > 0
+                        ? Text(
+                            ' ${time.toInt().toString()} ',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 30,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.cancel_outlined,
+                            size: 40,
+                            color: Colors.redAccent,
+                          ),
+                    interval: const Duration(microseconds: 100),
+                    onFinished: () {
+                      setState(() {
+                        whiteTimeOut = true;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text("Player 1 has exceeded time limit!"),
+                      ));
+                    },
+                  ),
+                ),
+              ],
+            ),
+            Text(checkStatus ? "CHECK!" : ""),
+            Expanded(
+              flex: 3,
+              child: GridView.builder(
+                  itemCount: 8 * 8,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 8,
+                  ),
+                  itemBuilder: (context, index) {
+                    int row = index ~/ 8;
+                    int col = index % 8;
+
+                    bool isWhite = (row + col) % 2 == 0;
+
+                    bool isSelected = selectedRow == row && selectedCol == col;
+
+                    bool isValidMove = false;
+                    for (var position in validMoves) {
+                      if (position[0] == row && position[1] == col) {
+                        isValidMove = true;
+                      }
+                    }
+
+                    return Square(
+                      isWhite: isWhite,
+                      piece: board[row][col],
+                      isSelected: isSelected,
+                      isValidMove: isValidMove,
+                      onTap: () => pieceSelected(row, col),
+                    );
+                  }),
+            ),
+            Row(
+              children: [
+                const Card(
+                  color: Colors.black26,
+                  shape: StadiumBorder(side: BorderSide(width: 3)),
+                  child: Text(
+                    " Player 2 ",
+                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Padding(padding: EdgeInsets.only(left: 135)),
+                Card(
+                  elevation: 0.0,
+                  color: Colors.black54,
+                  shape: const StadiumBorder(side: BorderSide()),
+                  child: Countdown(
+                    controller: _countdownControllerB,
+                    seconds: 600,
+                    build: (_, time) => time.toInt() > 0
+                        ? Text(
+                            ' ${time.toInt().toString()} ',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 30,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.cancel_outlined,
+                            size: 40,
+                            color: Colors.redAccent,
+                          ),
+                    interval: const Duration(seconds: 1),
+                    onFinished: () {
+                      setState(() {
+                        blackTimeOut = true;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text("Player 2 has exceeded time limit!"),
+                      ));
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(
+              height: 65,
+            ),
+          ],
+        ),
+      ),
+      persistentFooterButtons: [
+        IconButton(
+          onPressed: resetGame,
+          icon: const Icon(Icons.refresh),
+          iconSize: 35,
+        ),
+      ],
+      extendBody: true,
     );
   }
 }

@@ -27,7 +27,7 @@ class Square extends StatelessWidget {
       squareColor = Colors.lightGreenAccent;
     }
     else {
-      squareColor = isWhite ? Colors.grey[200] : Colors.grey[500];
+      squareColor = isWhite ? Colors.black12 : Colors.black54;
     }
     return GestureDetector(
       onTap: onTap,
